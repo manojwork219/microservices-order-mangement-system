@@ -5,8 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
@@ -33,124 +33,112 @@ import com.example.orderservice.service.OrderService;
 @Service
 public class OrderServiceImpl implements OrderService {
 
-    @Autowired
-    private RestTemplate restTemplate;
+	private final OrderRepository orderRepository;
+	private final RestTemplate restTemplate;
+	private final OrderKafkaProducer orderKafkaProducer;
 
-    @Value("${inventory.service.url}")
-    private String inventoryServiceUrl;
+	@Value("${inventory.service.url}")
+	private String inventoryServiceUrl;
 
-    @Autowired
-    private OrderKafkaProducer orderKafkaProducer;
+	public OrderServiceImpl(OrderRepository orderRepository, RestTemplate restTemplate,
+			OrderKafkaProducer orderKafkaProducer) {
+		this.orderRepository = orderRepository;
+		this.restTemplate = restTemplate;
+		this.orderKafkaProducer = orderKafkaProducer;
+	}
 
-    private final OrderRepository orderRepository;
+	public void setInventoryServiceUrl(String inventoryServiceUrl) {
+		this.inventoryServiceUrl = inventoryServiceUrl;
+	}
 
-    public OrderServiceImpl(OrderRepository orderRepository) {
-        this.orderRepository = orderRepository;
-    }
+	@Override
+	public OrderResponse placeOrder(PlaceOrderRequest orderRequest) {
+		List<OrderItem> orderItems = new ArrayList<>();
+		double totalPrice = 0.0;
 
-    @Override
-    public OrderResponse placeOrder(PlaceOrderRequest orderRequest) {
-        List<OrderItem> orderItems = new ArrayList<>();
-        double totalPrice = 0.0;
+		for (OrderItemRequest itemRequest : orderRequest.getItems()) {
+			String url = inventoryServiceUrl + "/" + itemRequest.getSkuCode();
 
-        for (OrderItemRequest itemRequest : orderRequest.getItems()) {
-            String url = inventoryServiceUrl + "/" + itemRequest.getSkuCode();
+			InventoryResponse inventory;
+			try {
+				ResponseEntity<InventoryResponse> response = restTemplate.getForEntity(url, InventoryResponse.class);
+				if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+					inventory = response.getBody();
 
-            InventoryResponse inventory;
-            try {
-                ResponseEntity<InventoryResponse> response = restTemplate.getForEntity(url, InventoryResponse.class);
-                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                    inventory = response.getBody();
+					if (inventory.getQuantity() < itemRequest.getQuantity()) {
+						throw new InventoryInsufficientException(
+								"Insufficient inventory for skuCode: " + itemRequest.getSkuCode());
+					}
+				} else {
+					throw new InventoryNotFoundException(
+							"Inventory not found for skuCode: " + itemRequest.getSkuCode());
+				}
+			}
 
-                    if (inventory.getQuantity() < itemRequest.getQuantity()) {
-                        throw new InventoryInsufficientException(
-                            "Insufficient inventory for skuCode: " + itemRequest.getSkuCode());
-                    }
-                } else {
-                    throw new InventoryNotFoundException("Inventory not found for skuCode: " + itemRequest.getSkuCode());
-                }
-            } catch (HttpClientErrorException.NotFound ex) {
-                throw new InventoryNotFoundException("Inventory not found for skuCode: " + itemRequest.getSkuCode());
-            } catch (HttpClientErrorException | HttpServerErrorException ex) {
-                throw new InventoryNotFoundException("Error from inventory service: " + ex.getStatusCode());
-            } catch (RestClientException ex) {
-                throw new InventoryNotFoundException("Unable to reach inventory service");
-            }
+			// change
+			catch (HttpClientErrorException e) {
+				if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+					throw new InventoryNotFoundException(
+							"Inventory not found for skuCode: " + itemRequest.getSkuCode());
+				}
+				throw new InventoryNotFoundException("Error from inventory service: " + e.getStatusCode());
+			}
 
-            OrderItem orderItem = OrderItem.builder()
-                    .skuCode(itemRequest.getSkuCode())
-                    .quantity(itemRequest.getQuantity())
-                    .pricePerItem(inventory.getPricePerItem())
-                    .build();
+			catch (RestClientException ex) {
+				throw new InventoryNotFoundException("Unable to reach inventory service");
+			}
 
-            totalPrice += inventory.getPricePerItem() * itemRequest.getQuantity();
-            orderItems.add(orderItem);
-        }
+			OrderItem orderItem = OrderItem.builder().skuCode(itemRequest.getSkuCode())
+					.quantity(itemRequest.getQuantity()).pricePerItem(inventory.getPricePerItem()).build();
 
-        Order order = Order.builder()
-                .orderNumber(UUID.randomUUID().toString())
-                .customerName(orderRequest.getCustomerName())
-                .paymentMode(orderRequest.getPaymentMode())
-                .deliveryAddress(orderRequest.getDeliveryAddress())
-                .orderStatus("CREATED")
-                .orderDate(LocalDateTime.now())
-                .totalPrice(totalPrice)
-                .items(orderItems)
-                .build();
+			totalPrice += inventory.getPricePerItem() * itemRequest.getQuantity();
+			orderItems.add(orderItem);
+		}
 
-        orderItems.forEach(item -> item.setOrder(order)); // Set order reference in each item
+		Order order = Order.builder().orderNumber(UUID.randomUUID().toString())
+				.customerName(orderRequest.getCustomerName()).paymentMode(orderRequest.getPaymentMode())
+				.deliveryAddress(orderRequest.getDeliveryAddress()).orderStatus("CREATED")
+				.orderDate(LocalDateTime.now()).totalPrice(totalPrice).items(orderItems).build();
 
-        orderRepository.save(order);
+		orderItems.forEach(item -> item.setOrder(order)); // Set order reference in each item
 
-        // Simplified Kafka message
-        List<OrderItemEvent> itemEvents = order.getItems().stream()
-        	    .map(item -> new OrderItemEvent(item.getSkuCode(), item.getQuantity(), item.getPricePerItem()))
-        	    .toList();
+		orderRepository.save(order);
 
-        	OrderPlacedEvent event = new OrderPlacedEvent(order.getOrderNumber(), itemEvents);
-        	orderKafkaProducer.sendMessage(event);
+		// Simplified Kafka message
+		List<OrderItemEvent> itemEvents = order.getItems().stream()
+				.map(item -> new OrderItemEvent(item.getSkuCode(), item.getQuantity(), item.getPricePerItem()))
+				.toList();
 
-        return mapToOrderResponse(order);
-    }
+		OrderPlacedEvent event = new OrderPlacedEvent(order.getOrderNumber(), itemEvents);
+		orderKafkaProducer.sendMessage(event);
 
-    @Override
-    public OrderResponse getOrderById(Long id) {
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new OrderNotFoundException("Order with ID " + id + " not found."));
+		return mapToOrderResponse(order);
+	}
 
-        return mapToOrderResponse(order);
-    }
+	@Override
+	public OrderResponse getOrderById(Long id) {
+		Order order = orderRepository.findById(id)
+				.orElseThrow(() -> new OrderNotFoundException("Order with ID " + id + " not found."));
 
+		return mapToOrderResponse(order);
+	}
 
-    @Override
-    public List<OrderResponse> getAllOrders() {
-        List<Order> orders = orderRepository.findAll();
-        return orders.stream()
-                .map(this::mapToOrderResponse)
-                .toList();
-    }
-    
-    @Override
+	@Override
+	public List<OrderResponse> getAllOrders() {
+		List<Order> orders = orderRepository.findAll();
+		return orders.stream().map(this::mapToOrderResponse).toList();
+	}
+
+	@Override
 	public OrderResponse mapToOrderResponse(Order order) {
-        List<OrderItemResponse> itemResponses = order.getItems().stream()
-                .map(item -> OrderItemResponse.builder()
-                        .skuCode(item.getSkuCode())
-                        .quantity(item.getQuantity())
-                        .pricePerItem(item.getPricePerItem())
-                        .build())
-                .toList();
+		List<OrderItemResponse> itemResponses = order.getItems().stream().map(item -> OrderItemResponse.builder()
+				.skuCode(item.getSkuCode()).quantity(item.getQuantity()).pricePerItem(item.getPricePerItem()).build())
+				.toList();
 
-        return OrderResponse.builder()
-                .orderNumber(order.getOrderNumber())
-                .customerName(order.getCustomerName())
-                .paymentMode(order.getPaymentMode())
-                .deliveryAddress(order.getDeliveryAddress())
-                .orderStatus(order.getOrderStatus())
-                .orderDate(order.getOrderDate())
-                .totalPrice(order.getTotalPrice())
-                .items(itemResponses)
-                .build();
-    }
-
+		return OrderResponse.builder().orderNumber(order.getOrderNumber()).customerName(order.getCustomerName())
+				.paymentMode(order.getPaymentMode()).deliveryAddress(order.getDeliveryAddress())
+				.orderStatus(order.getOrderStatus()).orderDate(order.getOrderDate()).totalPrice(order.getTotalPrice())
+				.items(itemResponses).build();
+	}
 
 }

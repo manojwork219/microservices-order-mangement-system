@@ -1,4 +1,4 @@
-package com.example.inventoryservice.service;
+package com.example.inventoryservice.service.impl;
 
 import java.util.List;
 
@@ -12,6 +12,7 @@ import com.example.inventoryservice.exception.InventoryNotFoundException;
 import com.example.inventoryservice.kafka.InventoryConfirmationProducer;
 import com.example.inventoryservice.model.Inventory;
 import com.example.inventoryservice.repository.InventoryRepository;
+import com.example.inventoryservice.service.InventoryService;
 
 @Service
 public class InventoryServiceImpl implements InventoryService {
