@@ -2,6 +2,7 @@ package com.example.inventoryservice.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
@@ -16,7 +17,7 @@ public class Inventory {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotNull(message = "skuCode cannot be null")
+    @NotBlank(message = "skuCode cannot be blank")
     @Column(name = "sku_code", nullable = false, unique = true)
     private String skuCode;
 
@@ -27,14 +28,13 @@ public class Inventory {
     @NotNull(message = "pricePerItem cannot be null")
     @Min(value = 0, message = "pricePerItem must be a positive value")
     @Column(name = "pricePerItem", nullable = false)
-    private double pricePerItem;
+    private Double pricePerItem;
 
     public Inventory() {}
 
-    public Inventory(String skuCode, int quantity, double pricePerItem) {
+    public Inventory(String skuCode, int quantity, Double pricePerItem) {
         this.skuCode = skuCode;
         this.quantity = quantity;
         this.pricePerItem = pricePerItem;
     }
-
 }

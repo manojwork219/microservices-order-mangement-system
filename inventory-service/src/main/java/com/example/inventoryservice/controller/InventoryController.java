@@ -14,9 +14,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.inventoryservice.exception.InventoryNotFoundException;
 import com.example.inventoryservice.model.Inventory;
 import com.example.inventoryservice.service.InventoryService;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/inventory")
@@ -26,7 +27,7 @@ public class InventoryController {
     private InventoryService inventoryService;
 
     @PostMapping("/create")
-    public ResponseEntity<Inventory> addInventory(@RequestBody Inventory inventory) {
+    public ResponseEntity<Inventory> addInventory(@Valid @RequestBody Inventory inventory) {
         return new ResponseEntity<>(inventoryService.addInventory(inventory), HttpStatus.CREATED);
     }
 
