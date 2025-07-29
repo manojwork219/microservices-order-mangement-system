@@ -1,0 +1,3 @@
+spring:
+  profiles:
+    active: local  # change to 'aws' for EC2
