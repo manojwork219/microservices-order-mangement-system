@@ -50,6 +50,7 @@ services:
       - microservices-net
 
   inventory-service:
+    image: manojwork219/inventory-service:latest
     build:
       context: ./inventory-service
     container_name: inventory-service
@@ -66,6 +67,7 @@ services:
       - microservices-net
 
   order-service:
+    image: manojwork219/order-service:latest
     build:
       context: ./order-service
     container_name: order-service
