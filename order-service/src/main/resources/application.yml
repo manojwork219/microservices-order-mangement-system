@@ -1,3 +1,3 @@
 spring:
   profiles:
-    active: local  # change to 'aws' for EC2
+    active: aws  # change to 'aws' for EC2
