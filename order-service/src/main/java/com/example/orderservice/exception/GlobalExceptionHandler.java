@@ -49,7 +49,6 @@ public class GlobalExceptionHandler {
 	}
 
 	// Handle custom InventoryException
-
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
 		Map<String, Object> response = new HashMap<>();
