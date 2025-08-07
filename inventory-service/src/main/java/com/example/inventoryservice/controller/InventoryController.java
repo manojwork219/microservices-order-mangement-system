@@ -37,7 +37,7 @@ public class InventoryController {
     }
 
     
-    @GetMapping("/{skuCode}")
+    @GetMapping("/{skuCode:\\d+}")
     public ResponseEntity<Inventory> getInventory(@PathVariable String skuCode) {
         Inventory inventory = inventoryService.getInventoryBySkuCode(skuCode);
         

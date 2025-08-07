@@ -1,3 +1,35 @@
 **/bin/
 # Maven build output
 **/target/
+
+# Maven
+target/
+*.log
+
+# IDEs
+*.iml
+.idea/
+*.classpath
+*.project
+*.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Others
+*.swp
+*.bak
+*.tmp
+.factorypath
+
+# Docker
+*.env
+docker-compose.override.yml
+
+# IntelliJ / Eclipse specific
+*.iws
+*.ipr
+*.log
+*.launch
+*.pydevproject
