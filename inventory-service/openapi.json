@@ -1,0 +1,118 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Inventory Service API",
+    "version": "1.0.0",
+    "description": "API documentation for the Inventory Service."
+  },
+  "paths": {
+    "/api/inventory/create": {
+      "post": {
+        "summary": "Add new inventory item",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Inventory" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Inventory item created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Inventory" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/all": {
+      "get": {
+        "summary": "Get all inventory items",
+        "responses": {
+          "200": {
+            "description": "List of all inventory items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Inventory" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/{skuCode}": {
+      "get": {
+        "summary": "Get inventory by SKU code",
+        "parameters": [
+          {
+            "name": "skuCode",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inventory item details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Inventory" }
+              }
+            }
+          },
+          "404": { "description": "Inventory not found" }
+        }
+      }
+    },
+    "/api/inventory/update/increment/{skuCode}": {
+      "put": {
+        "summary": "Increment inventory quantity and update price",
+        "parameters": [
+          {
+            "name": "skuCode",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "quantity",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "pricePerItem",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "number", "format": "double" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Inventory updated" },
+          "404": { "description": "Inventory not found" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Inventory": {
+        "type": "object",
+        "properties": {
+          "skuCode": { "type": "string" },
+          "quantity": { "type": "integer" },
+          "pricePerItem": { "type": "number", "format": "double" },
+          "lastUpdated": { "type": "string", "format": "date-time" }
+        },
+        "required": ["skuCode", "quantity", "pricePerItem"]
+      }
+    }
+  }
+}
