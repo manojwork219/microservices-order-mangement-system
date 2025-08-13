@@ -1,0 +1,119 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Order Service API",
+    "version": "1.0.0",
+    "description": "API documentation for the Order Service."
+  },
+  "paths": {
+    "/api/orders/all": {
+      "get": {
+        "summary": "Get all orders",
+        "responses": {
+          "200": {
+            "description": "List of all orders",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/OrderResponse" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/{id}": {
+      "get": {
+        "summary": "Get order by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrderResponse" }
+              }
+            }
+          },
+          "404": { "description": "Order not found" }
+        }
+      }
+    },
+    "/api/orders/create": {
+      "post": {
+        "summary": "Place a new order",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PlaceOrderRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrderResponse" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "OrderResponse": {
+        "type": "object",
+        "properties": {
+          "orderId": { "type": "integer" },
+          "customerId": { "type": "integer" },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OrderItem" }
+          },
+          "status": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "OrderItem": {
+        "type": "object",
+        "properties": {
+          "skuCode": { "type": "string" },
+          "quantity": { "type": "integer" },
+          "price": { "type": "number", "format": "double" }
+        }
+      },
+      "PlaceOrderRequest": {
+        "type": "object",
+        "properties": {
+          "customerId": { "type": "integer" },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OrderItemRequest" }
+          }
+        },
+        "required": ["customerId", "items"]
+      },
+      "OrderItemRequest": {
+        "type": "object",
+        "properties": {
+          "skuCode": { "type": "string" },
+          "quantity": { "type": "integer" }
+        },
+        "required": ["skuCode", "quantity"]
+      }
+    }
+  }
+}
